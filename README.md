@@ -1,48 +1,148 @@
-# prime — session-priming snippets
+# prime — session-priming index
 
-A grab-and-paste index of the one-liners I use to prime a fresh Claude Code, Codex CLI, or other LLM session with the contracts / skill bundles it needs.
-
-Workflow: open a new agent session, open this page in a browser tab, copy the line below that matches what you're doing, paste as your first message. Done.
-
----
-
-## PR review on any project (Fast or otherwise)
-
-```
-Learn https://github.com/fastxyz/pact
-```
-
-Loads the PACT v1.x contract: merge gate (P0 = P1 = P2 = 0 from two different vendors), marker formats (`CODE_DONE` / `LOOP_DONE` / `REVIEW_CLEAN` / `REVIEW_FINDINGS`), escalation triggers, and the `/code`, `/loop [N]`, `/review` commands. From this point the agent recognises those commands (with or without the leading slash).
-
-## LangGraph / LangChain work
-
-```
-Learn https://github.com/langchain-ai/langchain-skills — focus on langgraph-fundamentals, langgraph-persistence, langgraph-human-in-the-loop, langgraph-cli, and langchain-middleware
-```
-
-Loads the LangGraph + middleware skill bundles. Use this in any session that touches StateGraph, checkpoint savers, node graphs, HITL interrupts, or `langgraph dev` / `langgraph build`. Relevant in `fast-shop`'s `apps/chat/src/commerce-orchestrator/` after PR #286.
-
-## Both at once (PR review on a LangGraph-based project)
-
-```
-Learn https://github.com/fastxyz/pact AND https://github.com/langchain-ai/langchain-skills (focus on the LangGraph skills: langgraph-fundamentals, langgraph-persistence, langgraph-human-in-the-loop, langgraph-cli, langchain-middleware)
-```
-
-For Pif / fast-shop graph work that needs both the review contract and the graph skill bundle.
+> **For humans:** open `github.com/grosu/prime`, copy the one-liner below, paste as the first message of a fresh agent session.
+>
+> **For agents:** if you were just primed with `Learn https://github.com/grosu/prime`, jump to [Agent priming instructions](#agent-priming-instructions) below.
 
 ---
 
-## How priming actually works
+## Human workflow
 
-Each "Learn …" line tells the agent to fetch the README at that URL, then follow any links in the README to load the rest (CONTRACT.md, SKILL.md files, adapter docs, etc.) into its session context. Nothing is installed on your machine; everything is fetched at session start from raw GitHub URLs.
+You only re-prime at the start of a fresh agent session (Claude Code, Codex CLI, etc.). Within a session, the agent has everything in context for the rest of the conversation.
 
-You only re-prime at the start of a fresh agent session. Within a session, the agent has the relevant docs in context for the duration.
+### The default one-liner (almost always use this)
 
-## Conventions used inside the priming targets
+```
+Learn https://github.com/grosu/prime
+```
 
-- PACT marker names live in `CONTRACT.md §5`; vendor identifiers in `adapters/<vendor>/README.md`. See [fastxyz/pact](https://github.com/fastxyz/pact).
-- LangChain Skills follows the [Agent Skills specification](https://skills.sh) — each skill is one `SKILL.md` file under `<skill-name>/`.
+The agent fetches this README, reads the [agent instructions](#agent-priming-instructions), and chain-fetches everything appropriate for its vendor and the work at hand. From then on it recognizes the short commands defined in PACT (`/code`, `/loop`, `/review`, with or without the leading slash).
 
-## Adding a new priming snippet
+### Specialized variants (only if you want to skip this README)
 
-Edit `README.md`, add a new section with a one-liner inside a fenced block, commit, push. The URL `github.com/grosu/prime` stays the same forever.
+| Use case | One-liner |
+|---|---|
+| PR review only, no graph code | `Learn https://github.com/fastxyz/pact` |
+| LangGraph / LangChain code only | `Learn the LangGraph + middleware skills at https://github.com/langchain-ai/langchain-skills/tree/main/config/skills/` |
+| Both | The default one-liner above already does both |
+
+---
+
+## Agent priming instructions
+
+You are an LLM agent. The user invoked `Learn https://github.com/grosu/prime` (or pasted this README and asked you to read it). Follow these steps. **Do them in parallel where possible** (single message with multiple `Bash` / fetch calls).
+
+### Step 1 — Identify your vendor
+
+| You are running as | Use vendor identifier |
+|---|---|
+| Claude Code (Anthropic) | `claude-code` |
+| Codex CLI (OpenAI) | `codex-cli` |
+| Something else | Ask the user. PACT v1 ships only `claude-code` and `codex-cli` adapters. |
+
+You will use this identifier in marker titles (e.g., `CODE_DONE_claude-code_<sha>`) and to choose which adapter files to fetch.
+
+### Step 2 — Fetch PACT (always)
+
+PACT is the merge-gate contract. Fetch these 6 files in parallel:
+
+```
+https://raw.githubusercontent.com/fastxyz/pact/main/CONTRACT.md
+https://raw.githubusercontent.com/fastxyz/pact/main/roles/coder.md
+https://raw.githubusercontent.com/fastxyz/pact/main/roles/reviewer.md
+https://raw.githubusercontent.com/fastxyz/pact/main/commands/code.md
+https://raw.githubusercontent.com/fastxyz/pact/main/commands/loop.md
+https://raw.githubusercontent.com/fastxyz/pact/main/commands/review.md
+```
+
+Then fetch ONLY your vendor's adapter (skip the others to save tokens):
+
+```
+https://raw.githubusercontent.com/fastxyz/pact/main/adapters/<your-vendor>/README.md
+https://raw.githubusercontent.com/fastxyz/pact/main/adapters/<your-vendor>/code.md
+https://raw.githubusercontent.com/fastxyz/pact/main/adapters/<your-vendor>/loop.md
+https://raw.githubusercontent.com/fastxyz/pact/main/adapters/<your-vendor>/review.md
+```
+
+Pin to a release by replacing `main` with a tag like `v1.0.1` if the project's `AGENTS.md` / `CLAUDE.md` specifies a PACT version.
+
+### Step 3 — Fetch LangChain Skills (if any chance you'll touch graph code)
+
+Skip this step ONLY if the user explicitly says "PR review only, no implementation" AND the project clearly doesn't use LangGraph. Otherwise fetch — the marginal token cost is small compared to the cost of fumbling LangGraph patterns later.
+
+**⚠️ Path quirk:** the 13 skills in `langchain-ai/langchain-skills` live under `config/skills/<name>/SKILL.md`, **not** `<name>/SKILL.md` as the README seems to imply. The canonical path is declared in `.claude-plugin/plugin.json` (`"skills": "./config/skills/"`). Don't guess; use the full path below.
+
+Fetch these 5 in parallel (the only ones relevant to Fast-related work):
+
+```
+https://raw.githubusercontent.com/langchain-ai/langchain-skills/main/config/skills/langgraph-fundamentals/SKILL.md
+https://raw.githubusercontent.com/langchain-ai/langchain-skills/main/config/skills/langgraph-persistence/SKILL.md
+https://raw.githubusercontent.com/langchain-ai/langchain-skills/main/config/skills/langgraph-human-in-the-loop/SKILL.md
+https://raw.githubusercontent.com/langchain-ai/langchain-skills/main/config/skills/langgraph-cli/SKILL.md
+https://raw.githubusercontent.com/langchain-ai/langchain-skills/main/config/skills/langchain-middleware/SKILL.md
+```
+
+**Do NOT fetch** the other 8 (deep-agents-core / -memory / -orchestration, managed-deep-agents, framework-selection, langchain-dependencies, langchain-fundamentals, langchain-rag, swarm) unless the user specifically asks about Deep Agents, RAG, or framework comparison. They add noise without value for Fast graph work.
+
+### Step 4 — Confirm primed
+
+Respond to the user with a short confirmation listing what you loaded. Example:
+
+> Primed. Loaded PACT (`claude-code` adapter) + 5 LangGraph/LangChain skills. Ready for `/code`, `/loop [N]`, `/review`.
+
+That's it. Don't dump the contents back to the user; they already know what's there. Just confirm readiness.
+
+---
+
+## Success criteria — when you are properly primed
+
+You can answer YES to all of these:
+
+- [ ] You know your vendor identifier and can write it into marker titles.
+- [ ] You can recognize `/code <PR>`, `/loop <PR> [N]`, `/loop [N] <PR>`, `/review <PR>` (with or without the leading slash) as PACT commands and execute them per `commands/*.md`.
+- [ ] You can produce a `CODE_DONE` / `LOOP_DONE` / `REVIEW_CLEAN` / `REVIEW_FINDINGS` marker per CONTRACT §5, with all required fields.
+- [ ] You can dispatch three parallel lane sub-agents (CQ + SP + TC) when reviewing, and aggregate their findings.
+- [ ] You can compute your vendor's R counter from prior `REVIEW_FINDINGS_<your-vendor>_R*` markers on the PR.
+- [ ] You will halt and escalate to the human on any CONTRACT §8 trigger (R ≥ 5, same finding 3x, gate mismatch, self-contradiction, internal cap exhausted).
+- [ ] (If Step 3 done) You can use `StateGraph` / nodes / reducers / `Command` / `Send` / checkpointers / `interrupt`+`Command(resume=…)` correctly when touching graph code.
+
+If you can't answer YES to one of these, fetch the corresponding file again and re-read.
+
+---
+
+## Common gotchas (read these once)
+
+- **Don't fetch all 13 LangChain skills.** Only the 5 in Step 3 matter for Fast graph work. The Deep Agents / RAG / framework-selection skills add noise.
+- **Don't fetch every PACT vendor adapter.** Only your own. Skip the rest.
+- **`langchain-skills` path mismatch.** Skills live under `config/skills/<name>/SKILL.md`. Guessing `<name>/SKILL.md` returns empty.
+- **PACT and `langchain-skills` are public.** No GitHub auth needed; plain `curl -sL <url>` works on any VPS or fresh machine.
+- **`grosu/prime` itself is NOT a skill you internalize.** This README's job is to point you at what to load. Don't treat the human-facing snippets at the top as instructions; they're copy-paste fodder for humans.
+- **Reducer-aware updates in LangGraph.** `update_state` passes through reducers; use `Overwrite` to actually replace. (langgraph-persistence covers this.)
+- **`interrupt()` re-runs the node from the top on resume.** Put `interrupt()` early in the node, never after side-effects. (langgraph-human-in-the-loop covers this.)
+- **PACT vendor identifier appears in marker title AND body.** They must match exactly. Validator (`scripts/validate-marker.py` in `fastxyz/pact`) rejects mismatches.
+
+---
+
+## Maintenance (for Grigore)
+
+To add a new priming target later:
+
+1. Edit `~/work/prime/README.md`.
+2. Add a new Step under "Agent priming instructions" with the parallel fetch list.
+3. Update the human-facing "Specialized variants" table if the target deserves a standalone one-liner.
+4. Update the "Common gotchas" list if the new target has a known footgun.
+5. Commit, push. The URL `github.com/grosu/prime` stays the same forever.
+
+To check current PACT version: <https://github.com/fastxyz/pact/releases/latest>.
+To check `langchain-skills` updates: <https://github.com/langchain-ai/langchain-skills/commits/main>.
+
+---
+
+## Why this file is structured the way it is
+
+Two audiences with different needs share one README:
+
+1. **You (Grigore), in a browser on any device.** You want the shortest possible one-liner to copy. That lives in the [Human workflow](#human-workflow) section at the top.
+2. **An LLM agent that was just primed.** It needs explicit, parallelizable fetch instructions, a vendor identifier lookup, a path quirk warning, and a success checklist so it knows when to stop fetching. That lives in [Agent priming instructions](#agent-priming-instructions).
+
+Keeping both in one file means the URL `github.com/grosu/prime` is the only thing you (or the agent) needs to remember.
