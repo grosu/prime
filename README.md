@@ -123,6 +123,40 @@ If you can't answer YES to one of these, fetch the corresponding file again and 
 
 ---
 
+## Speed tips
+
+Priming and execution have very different reasoning needs. **Match the model to the phase.**
+
+| Phase | Recommended reasoning | Why |
+|---|---|---|
+| Priming (`Learn https://github.com/grosu/prime`) | **Low / fast** (Haiku in Claude Code; lowest-effort tier in Codex CLI) | Pure follow-the-list mechanical work: fetch URLs, store contents, confirm. No synthesis or judgment. High reasoning is wasted compute here. |
+| `/code <PR>` — implementing a fix | High (Opus / Sonnet) | Plans per-finding disposition (fix vs defer vs dispute), writes code that respects project patterns. |
+| `/loop <PR>` — internal converge | High | Same as `/code` PLUS runs internal multi-lane self-review (judgment-heavy). |
+| `/review <PR>` — external review | **Highest available** | This IS the merge gate. Findings here determine whether the PR can ship. Don't cut corners. |
+
+**In Claude Code**, switch with `/model`:
+
+```
+/model haiku
+Learn https://github.com/grosu/prime
+/model opus
+/code 282
+```
+
+**In Codex CLI**, use the equivalent reasoning-effort toggle (e.g., `--reasoning low` for priming, `--reasoning high` for command execution; check your local Codex CLI version's flag).
+
+### Optional: lazy priming
+
+If session startup feels slow even on a fast model, you can defer fetches until they're actually needed. Phrase the prime as:
+
+```
+Learn lazily: https://github.com/grosu/prime — skim this README only; fetch the specific PACT or skill files on first /code, /loop, or /review.
+```
+
+Trade-off: first command runs ~10-20 seconds slower (paying the fetch cost then). Subsequent commands are fast. Use lazy priming when you're not sure you'll actually issue a PACT command in this session.
+
+---
+
 ## Maintenance (for Grigore)
 
 To add a new priming target later:
